@@ -10,7 +10,12 @@ add_executable(${PROJECT_NAME}
 	src/hittable.h
 	src/hittable_list.h
 	src/sphere.h
+	src/moving_sphere.h
 	src/camera.h
+	src/aabb.h
+	src/bvh.h
+	src/constants.h
+	src/material.h
 )
 
 # Include Eigen for linear algebra, stb and gif-h to export images, json to parse the json files
@@ -21,7 +26,3 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_RE
 
 # Place the output binary at the root of the build folder
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-
-# Folder where data files are stored (meshes & stuff)
-# set(DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data/")
-# target_compile_definitions(${PROJECT_NAME} PUBLIC -DDATA_DIR=\"${DATA_DIR}\")
