@@ -4,6 +4,7 @@ project(parallel_ray_tracing)
 # Project sources
 add_executable(${PROJECT_NAME}
 	src/main.cpp
+	src/utils.h
 	src/color.h
 	src/vec3.h
 	src/ray.h
@@ -16,10 +17,16 @@ add_executable(${PROJECT_NAME}
 	src/bvh.h
 	src/constants.h
 	src/material.h
+	src/texture.h
+	src/perlin.h
+	src/rtw_stb_image.h
+	src/aarect.h
+	src/box.h
+	src/constant_medium.h
 )
 
 # Include Eigen for linear algebra, stb and gif-h to export images, json to parse the json files
-target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../ext/eigen" "${CMAKE_CURRENT_SOURCE_DIR}/../ext/stb" "${CMAKE_CURRENT_SOURCE_DIR}/../ext/gif-h" "${CMAKE_CURRENT_SOURCE_DIR}/../ext/json")
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen" "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
 
 # Use C++11 version of the standard
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)

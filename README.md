@@ -31,6 +31,11 @@ make
 Making ```-DCMAKE_BUILD_TYPE``` to ```Release``` then you can accelerate your program.\
 \
 **What You should Get**\
-You can get the following image following the instruction. It takes me about 25mins to produce this picture on my laptop, a Macbook Pro 16' with Intel processor. Hope our parallel version can perform better.
+If you choose ```world=random_scene()``` in the ```main``` function, then you can get the following image following the instruction. It takes me about 25mins to produce this picture on my laptop, a Macbook Pro 16' with Intel processor. Hope our parallel version can perform better.
 
 !["Image Missing"](img/image.png?raw=true)
+
+A more complicated scene can be rendered when you set ```world=final_scene()``` in the ```main``` function. It takes me about 160mins to render this picture.
+<p align="center">
+  <img src="img/raytrace.png" />
+</p>
