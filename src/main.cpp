@@ -16,6 +16,7 @@
 #include "utils.h"
 
 #include <iostream>
+#include <omp.h>
 
 // Eigen for matrix operations
 #include <Eigen/Dense>
@@ -258,13 +259,23 @@ hittable_list final_scene() {
     return objects;
 }
 
+int main(int argc, char *argv[]) {
 
-int main() {
+    // Threads Setting
+    int threads_count = 0;
+
+    if(argc != 2)
+    {
+	printf("usage: ./genfile num\n");
+	printf("num of threads\n");
+ 	exit(1);
+    }
+    threads_count = atoi(argv[1]);
 
     // Image
 
     auto aspect_ratio = 16.0 / 9.0;
-    int image_width = 400;
+    int image_width = 800;
     int samples_per_pixel = 100;
     int max_depth = 5;
 
@@ -279,6 +290,7 @@ int main() {
     color background(0,0,0);
 
     switch (0) {
+        default:
         case 1:
             world = random_scene();
             background = color(0.70, 0.80, 1.00);
@@ -340,7 +352,6 @@ int main() {
             vfov = 40.0;
             break;
 
-        default:
         case 8:
             world = final_scene();
             aspect_ratio = 1.0;
@@ -367,8 +378,11 @@ int main() {
 	MatrixXd B = MatrixXd::Zero(image_width, image_height);
 	MatrixXd A = MatrixXd::Zero(image_width, image_height); // Store the alpha mask
 
+    double t_start, t_end;
+    t_start = omp_get_wtime();
+    #pragma omp parallel for num_threads(threads_count)
     for (int i = image_width - 1; i >= 0; --i) {
-        std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
+        //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
         for (int j = 0; j < image_height; ++j) {
             color pixel_color(0,0,0);
             for (int s = 0; s < samples_per_pixel; ++s) {
@@ -388,7 +402,8 @@ int main() {
             A(i, j) = 1;
         }
     }
-
+    t_end = omp_get_wtime();
+    std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
     std::cerr << "\nDone.\n";
 
 	// Save to png

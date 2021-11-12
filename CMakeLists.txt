@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.1)
+# add options for compiler
+SET(GCC_COVERAGE_COMPILE_FLAGS "-fopenmp -std=c++11")
+# specify your compiler, you can do it in command line using -DCMAKE_CXX_COMPILER
+# set(CMAKE_CXX_COMPILER "g++-11")
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}")
 project(parallel_ray_tracing)
 
 # Project sources
@@ -33,3 +38,5 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_RE
 
 # Place the output binary at the root of the build folder
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+
