@@ -30,7 +30,7 @@ set ( COMMON_ALL_CUDA
 )
 
 
-set ( SOURCE_NEXT_WEEK_CUDA
+set ( SOURCE_CUDA
   ${COMMON_ALL_CUDA}
   src/aabb.cuh
   # commonCuda/external/stb_image.h
@@ -49,4 +49,4 @@ set ( SOURCE_NEXT_WEEK_CUDA
   src/main.cu
   )
 
-add_executable(theNextWeekCuda   ${SOURCE_NEXT_WEEK_CUDA})
+add_executable(parallel_cuda   ${SOURCE_CUDA})
