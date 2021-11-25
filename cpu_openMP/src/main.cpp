@@ -10,6 +10,7 @@
 #include "aarect.h"
 #include "box.h"
 #include "constant_medium.h"
+#include "operation.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION // Do not include this line twice in your project!
 #include "stb_image_write.h"
@@ -17,31 +18,59 @@
 
 #include <iostream>
 #include <omp.h>
+#include <vector>
 
 // Eigen for matrix operations
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 using namespace Eigen;
 
-color ray_color(const ray& r, const color& background, const hittable& world, int depth) {
+// global variables
+MatrixXd R;
+MatrixXd G;
+MatrixXd B;
+MatrixXd A; // Store the alpha mask
+std::vector<operation> curr, next;
+
+
+void ray_color(operation& op, const hittable& world, const color& background) {
     hit_record rec;
 
     // If we've exceeded the ray bounce limit, no more light is gathered.
-    if (depth <= 0)
-        return color(0,0,0);
+    if (op.dep <= 0) {
+        R(op.indX, op.indY) += op.emit[0];
+        G(op.indX, op.indY) += op.emit[1];
+        B(op.indX, op.indY) += op.emit[2];
+    }
 
     // If the ray hits nothing, return the background color.
-    if (!world.hit(r, 0.001, infinity, rec))
-        return background;
+    else if (!world.hit(op.scat, 0.001, infinity, rec)) {
+        op.emit += op.atten * background;
+        R(op.indX, op.indY) += op.emit[0];
+        G(op.indX, op.indY) += op.emit[1];
+        B(op.indX, op.indY) += op.emit[2];
+    }
 
-    ray scattered;
-    color attenuation;
-    color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+    else {
+        ray scattered;
+        color attenuation;
+        color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+        std::cout << emitted << std::endl;
+        op.emit += op.atten * emitted;
 
-    if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered))
-        return emitted;
+        if (!rec.mat_ptr->scatter(op.scat, rec, attenuation, scattered)) {
+            R(op.indX, op.indY) += op.emit[0];
+            G(op.indX, op.indY) += op.emit[1];
+            B(op.indX, op.indY) += op.emit[2];
+        }
 
-    return emitted + attenuation * ray_color(scattered, background, world, depth-1);
+        else {
+            op.dep--;
+            op.scat = scattered;
+            op.atten = attenuation;
+            next.push_back(op);
+        }
+    }
 }
 
 // Create a scene for render
@@ -277,7 +306,7 @@ int main(int argc, char *argv[]) {
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 800;
     int samples_per_pixel = 100;
-    int max_depth = 5;
+    int max_depth = 10;
 
     // World
 
@@ -298,7 +327,7 @@ int main(int argc, char *argv[]) {
             lookat = point3(0,0,0);
             vfov = 20.0;
             aperture = 0.1;
-            image_width = 1200;
+            image_width = 400;
             aspect_ratio = 3.0 / 2.0;
             break;
 
@@ -375,37 +404,65 @@ int main(int argc, char *argv[]) {
 
     // Render
 
-    MatrixXd R = MatrixXd::Zero(image_width, image_height);
-	MatrixXd G = MatrixXd::Zero(image_width, image_height);
-	MatrixXd B = MatrixXd::Zero(image_width, image_height);
-	MatrixXd A = MatrixXd::Zero(image_width, image_height); // Store the alpha mask
+    R = MatrixXd::Zero(image_width, image_height);
+	G = MatrixXd::Zero(image_width, image_height);
+	B = MatrixXd::Zero(image_width, image_height);
+	A = MatrixXd::Ones(image_width, image_height); // Store the alpha mask
 
-    double t_start, t_end;
-    t_start = omp_get_wtime();
-    #pragma omp parallel for num_threads(threads_count)
-    for (int i = image_width - 1; i >= 0; --i) {
-        //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
-        for (int j = 0; j < image_height; ++j) {
-            color pixel_color(0,0,0);
-            for (int s = 0; s < samples_per_pixel; ++s) {
+    for (int i = 0; i < image_width; i++) {
+        for (int j = 0; j < image_height; j++) {
+            for (int s = 0; s < samples_per_pixel; s++) {
                 auto u = (i + random_double()) / (image_width-1);
                 auto v = (j + random_double()) / (image_height-1);
                 ray r = cam.get_ray(u, v);
-                pixel_color += ray_color(r, background, world, max_depth);
+                color attenuation = color(1, 1, 1);
+                next.push_back(operation(r, attenuation, i, j, 1));
             }
-            auto scale = 1.0 / samples_per_pixel;
-            // gamma = 2.0
-            auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
-            auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
-            auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-            R(i, j) = r;
-            G(i, j) = g;
-            B(i, j) = b;
-            A(i, j) = 1;
         }
     }
-    t_end = omp_get_wtime();
-    std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
+
+    while (next.size() > 0) {
+        curr.swap(next);
+        next.clear();
+        for (int i = 0; i < curr.size(); i++) {
+            ray_color(curr[i], world, background);
+        }
+    }
+    auto scale = 1.0 / samples_per_pixel;
+    for (int i = 0; i < image_width; i++) {
+        for (int j = 0; j < image_height; j++) {
+            R(i, j) = clamp(sqrt(scale * R(i, j)), 0.0, 0.999);
+            G(i, j) = clamp(sqrt(scale * G(i, j)), 0.0, 0.999);
+            B(i, j) = clamp(sqrt(scale * B(i, j)), 0.0, 0.999);
+        }
+    }
+
+    // double t_start, t_end;
+    // t_start = omp_get_wtime();
+    // #pragma omp parallel for num_threads(threads_count)
+    // for (int i = image_width - 1; i >= 0; --i) {
+    //     //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
+    //     for (int j = 0; j < image_height; ++j) {
+    //         color pixel_color(0,0,0);
+    //         for (int s = 0; s < samples_per_pixel; ++s) {
+    //             auto u = (i + random_double()) / (image_width-1);
+    //             auto v = (j + random_double()) / (image_height-1);
+    //             ray r = cam.get_ray(u, v);
+    //             pixel_color += ray_color(r, background, world, max_depth);
+    //         }
+    //         auto scale = 1.0 / samples_per_pixel;
+    //         // gamma = 2.0
+    //         auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
+    //         auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
+    //         auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
+    //         R(i, j) = r;
+    //         G(i, j) = g;
+    //         B(i, j) = b;
+    //         A(i, j) = 1;
+    //     }
+    // }
+    // t_end = omp_get_wtime();
+    // std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
     std::cerr << "\nDone.\n";
 
 	// Save to png
