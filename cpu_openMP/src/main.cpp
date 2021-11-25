@@ -26,11 +26,7 @@
 using namespace Eigen;
 
 // global variables
-MatrixXd R;
-MatrixXd G;
-MatrixXd B;
-MatrixXd A; // Store the alpha mask
-std::vector<operation> curr, next;
+std::vector<operation*> origin, curr, next;
 
 
 void ray_color(operation& op, const hittable& world, const color& background) {
@@ -38,37 +34,26 @@ void ray_color(operation& op, const hittable& world, const color& background) {
 
     // If we've exceeded the ray bounce limit, no more light is gathered.
     if (op.dep <= 0) {
-        R(op.indX, op.indY) += op.emit[0];
-        G(op.indX, op.indY) += op.emit[1];
-        B(op.indX, op.indY) += op.emit[2];
+        op.emit += color(0, 0, 0);
     }
 
     // If the ray hits nothing, return the background color.
     else if (!world.hit(op.scat, 0.001, infinity, rec)) {
         op.emit += op.atten * background;
-        R(op.indX, op.indY) += op.emit[0];
-        G(op.indX, op.indY) += op.emit[1];
-        B(op.indX, op.indY) += op.emit[2];
     }
 
     else {
         ray scattered;
         color attenuation;
         color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-        std::cout << emitted << std::endl;
+        // std::cout << emitted << std::endl;
         op.emit += op.atten * emitted;
 
-        if (!rec.mat_ptr->scatter(op.scat, rec, attenuation, scattered)) {
-            R(op.indX, op.indY) += op.emit[0];
-            G(op.indX, op.indY) += op.emit[1];
-            B(op.indX, op.indY) += op.emit[2];
-        }
-
-        else {
+        if (rec.mat_ptr->scatter(op.scat, rec, attenuation, scattered)) {
             op.dep--;
             op.scat = scattered;
             op.atten = attenuation;
-            next.push_back(op);
+            next.push_back(&op);
         }
     }
 }
@@ -305,8 +290,8 @@ int main(int argc, char *argv[]) {
 
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 800;
-    int samples_per_pixel = 100;
-    int max_depth = 10;
+    int samples_per_pixel = 10;
+    int max_depth = 5;
 
     // World
 
@@ -404,10 +389,10 @@ int main(int argc, char *argv[]) {
 
     // Render
 
-    R = MatrixXd::Zero(image_width, image_height);
-	G = MatrixXd::Zero(image_width, image_height);
-	B = MatrixXd::Zero(image_width, image_height);
-	A = MatrixXd::Ones(image_width, image_height); // Store the alpha mask
+    MatrixXd R = MatrixXd::Zero(image_width, image_height);
+	MatrixXd G = MatrixXd::Zero(image_width, image_height);
+	MatrixXd B = MatrixXd::Zero(image_width, image_height);
+	MatrixXd A = MatrixXd::Ones(image_width, image_height); // Store the alpha mask
 
     for (int i = 0; i < image_width; i++) {
         for (int j = 0; j < image_height; j++) {
@@ -416,26 +401,40 @@ int main(int argc, char *argv[]) {
                 auto v = (j + random_double()) / (image_height-1);
                 ray r = cam.get_ray(u, v);
                 color attenuation = color(1, 1, 1);
-                next.push_back(operation(r, attenuation, i, j, 1));
+                operation* new_op = new operation(r, attenuation, i, j, max_depth);
+                origin.push_back(new_op);
+                next.push_back(new_op);
             }
         }
     }
 
     while (next.size() > 0) {
+        std::cerr << "\rDepth remaining: " << next[0]->dep << " " << std::flush;
         curr.swap(next);
         next.clear();
         for (int i = 0; i < curr.size(); i++) {
-            ray_color(curr[i], world, background);
+            ray_color(*curr[i], world, background);
         }
     }
+
+    color pixel_color(0, 0, 0);
+    for (int i = 0; i < samples_per_pixel; i++) {
+        std::cerr << "Index: " << origin[i]->indX << " " << origin[i]->indY << std::endl;
+        pixel_color += origin[i]->emit;
+    }
+
     auto scale = 1.0 / samples_per_pixel;
-    for (int i = 0; i < image_width; i++) {
-        for (int j = 0; j < image_height; j++) {
-            R(i, j) = clamp(sqrt(scale * R(i, j)), 0.0, 0.999);
-            G(i, j) = clamp(sqrt(scale * G(i, j)), 0.0, 0.999);
-            B(i, j) = clamp(sqrt(scale * B(i, j)), 0.0, 0.999);
-        }
-    }
+    auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
+    auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
+    auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
+    std::cout << r << " " << g << " " << b << std::endl;
+    // for (int i = 0; i < image_width; i++) {
+    //     for (int j = 0; j < image_height; j++) {
+    //         R(i, j) = clamp(sqrt(scale * R(i, j)), 0.0, 0.999);
+    //         G(i, j) = clamp(sqrt(scale * G(i, j)), 0.0, 0.999);
+    //         B(i, j) = clamp(sqrt(scale * B(i, j)), 0.0, 0.999);
+    //     }
+    // }
 
     // double t_start, t_end;
     // t_start = omp_get_wtime();
