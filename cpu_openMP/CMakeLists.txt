@@ -28,6 +28,7 @@ add_executable(${PROJECT_NAME}
 	src/aarect.h
 	src/box.h
 	src/constant_medium.h
+	src/operation.h
 )
 
 # Include Eigen for linear algebra, stb and gif-h to export images, json to parse the json files
