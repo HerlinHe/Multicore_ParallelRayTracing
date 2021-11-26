@@ -382,7 +382,8 @@ int main(int argc, char *argv[]) {
 
     double t_start, t_end;
     t_start = omp_get_wtime();
-    #pragma omp parallel for num_threads(threads_count)
+    #pragma omp parallel for num_threads(threads_count) \
+        schedule(static, 1)
     for (int i = image_width - 1; i >= 0; --i) {
         //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
         for (int j = 0; j < image_height; ++j) {
