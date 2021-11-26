@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
 
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 800;
-    int samples_per_pixel = 10;
+    int samples_per_pixel = 100;
     int max_depth = 5;
 
     // World
@@ -398,71 +398,83 @@ int main(int argc, char *argv[]) {
     std::vector<int> curr(image_width * image_height * samples_per_pixel);
     int count = image_width * image_height *samples_per_pixel;
     
+    double p_cost = 0, d_cost = 0; // time of parallel cost and reconstruct cost
     double start = omp_get_wtime();
-    #pragma omp parallel for num_threads(threads_count)
-    for (int i = 0; i < image_width; i++) {
-        for (int j = 0; j < image_height; j++) {
-            for (int s = 0; s < samples_per_pixel; s++) {
-                auto u = (i + random_double()) / (image_width-1);
-                auto v = (j + random_double()) / (image_height-1);
-                int index = (i * image_height + j) * samples_per_pixel + s;
-                ray r = cam.get_ray(u, v);
-                color attenuation = color(1, 1, 1);
-                shared_ptr<operation> new_op(new operation(r, attenuation, i, j, max_depth));
-                origin[index] = new_op;
-                curr[index] = index;
-            }
-        }
-    }
-    std::cerr << "Time for initializing operations: " << omp_get_wtime() - start << std::endl;
-
-    double t_cost, t_start, t_end;
-    t_start = omp_get_wtime();
     #pragma omp parallel num_threads(threads_count)
-    while (count > 0) {
-        #pragma omp single
-        {
-            std::cerr << "\rDepth remaining: " << origin[curr[0]]->dep << " " << std::flush;
-        }
-        
+    {
         #pragma omp for
-        for (int i = 0; i < count; i++) {
-            ray_color(origin[curr[i]], world, background);
-        }
-
-        #pragma omp single
-        {
-            int recount = 0;
-            for (int i = 0; i < count; i++) {
-                if (origin[curr[i]]->finished != 1) {
-                    curr[recount++] = curr[i];
+        for (int i = 0; i < image_width; i++) {
+            for (int j = 0; j < image_height; j++) {
+                for (int s = 0; s < samples_per_pixel; s++) {
+                    auto u = (i + random_double()) / (image_width-1);
+                    auto v = (j + random_double()) / (image_height-1);
+                    int index = (i * image_height + j) * samples_per_pixel + s;
+                    ray r = cam.get_ray(u, v);
+                    color attenuation = color(1, 1, 1);
+                    shared_ptr<operation> new_op(new operation(r, attenuation, i, j, max_depth));
+                    origin[index] = new_op;
+                    curr[index] = index;
                 }
             }
-            count = recount;
         }
-    }
-    t_end = omp_get_wtime();
-    t_cost = t_end - t_start;
-    
-    for (int i = 0; i < image_width; i++) {
-        for (int j = 0; j < image_height; j++) {
-            color pixel_color(0, 0, 0);
-            int start_index = (i * image_height + j) * samples_per_pixel;
-            for (int s = 0; s < samples_per_pixel; s++) {
-                pixel_color += origin[start_index + s]->emit;
+        #pragma omp single
+        std::cerr << "Time for initializing operations: " << omp_get_wtime() - start << std::endl;
+
+        while (count > 0) {
+            #pragma omp single
+            {
+                std::cerr << "\rDepth remaining: " << origin[curr[0]]->dep << " " << std::flush;
+                start = omp_get_wtime();
             }
-            auto scale = 1.0 / samples_per_pixel;
-            auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
-            auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
-            auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-            R(i, j) = r;
-            G(i, j) = g;
-            B(i, j) = b;
+            
+            #pragma omp for
+            for (int i = 0; i < count; i++) {
+                ray_color(origin[curr[i]], world, background);
+            }
+
+            #pragma omp single
+            {
+                p_cost += omp_get_wtime() - start;
+                int recount = 0;
+                start = omp_get_wtime();
+                for (int i = 0; i < count; i++) {
+                    if (origin[curr[i]]->finished != 1) {
+                        curr[recount++] = curr[i];
+                    }
+                }
+                count = recount;
+                d_cost += omp_get_wtime() - start;
+            }
         }
+
+        #pragma omp single
+        {
+            std::cerr << "\nTime for prarallel part: " << p_cost << std::endl;
+            std::cerr << "Time for reconstruct operations: " << d_cost << std::endl;
+            start = omp_get_wtime();
+        }
+
+        #pragma omp for
+            for (int i = 0; i < image_width; i++) {
+                for (int j = 0; j < image_height; j++) {
+                    color pixel_color(0, 0, 0);
+                    int start_index = (i * image_height + j) * samples_per_pixel;
+                    for (int s = 0; s < samples_per_pixel; s++) {
+                        pixel_color += origin[start_index + s]->emit;
+                    }
+                    auto scale = 1.0 / samples_per_pixel;
+                    auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
+                    auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
+                    auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
+                    R(i, j) = r;
+                    G(i, j) = g;
+                    B(i, j) = b;
+                }
+            }
+        #pragma omp single
+        std::cerr << "Time for write colors: " << omp_get_wtime() - start << std::endl;
     }
-    
-    std::cerr << "\nTime for parallel part is: " << t_cost << "s";
-    std::cerr << "\nDone.\n";
+    std::cerr << "Done.\n";
 
 	// Save to png
 	const std::string filename("raytrace.png");
