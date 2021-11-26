@@ -25,37 +25,37 @@
 #include <Eigen/Geometry>
 using namespace Eigen;
 
-// global variables
-std::vector<operation*> origin, curr, next;
-
-
-void ray_color(operation& op, const hittable& world, const color& background) {
+int ray_color(shared_ptr<operation> op, const hittable& world, const color& background) {
     hit_record rec;
 
     // If we've exceeded the ray bounce limit, no more light is gathered.
-    if (op.dep <= 0) {
-        op.emit += color(0, 0, 0);
+    if (op->dep <= 0) {
+        op->emit += color(0, 0, 0);
+        op->finished = 1;
+        return 1;
     }
 
     // If the ray hits nothing, return the background color.
-    else if (!world.hit(op.scat, 0.001, infinity, rec)) {
-        op.emit += op.atten * background;
+    if (!world.hit(op->scat, 0.001, infinity, rec)) {
+        op->emit += op->atten * background;
+        op->finished = 1;
+        return 1;
     }
 
-    else {
-        ray scattered;
-        color attenuation;
-        color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-        // std::cout << emitted << std::endl;
-        op.emit += op.atten * emitted;
+    ray scattered;
+    color attenuation;
+    color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+    // std::cout << emitted << std::endl;
+    op->emit += op->atten * emitted;
 
-        if (rec.mat_ptr->scatter(op.scat, rec, attenuation, scattered)) {
-            op.dep--;
-            op.scat = scattered;
-            op.atten = attenuation;
-            next.push_back(&op);
-        }
+    if (rec.mat_ptr->scatter(op->scat, rec, attenuation, scattered)) {
+        op->dep--;
+        op->scat = scattered;
+        op->atten = op->atten * attenuation;
+        return 0;
     }
+    op->finished = 1;
+    return 1;
 }
 
 // Create a scene for render
@@ -312,7 +312,7 @@ int main(int argc, char *argv[]) {
             lookat = point3(0,0,0);
             vfov = 20.0;
             aperture = 0.1;
-            image_width = 400;
+            image_width = 1200;
             aspect_ratio = 3.0 / 2.0;
             break;
 
@@ -394,74 +394,74 @@ int main(int argc, char *argv[]) {
 	MatrixXd B = MatrixXd::Zero(image_width, image_height);
 	MatrixXd A = MatrixXd::Ones(image_width, image_height); // Store the alpha mask
 
+    std::vector<shared_ptr<operation>> origin(image_width * image_height * samples_per_pixel);
+    std::vector<int> curr(image_width * image_height * samples_per_pixel);
+    int count = image_width * image_height *samples_per_pixel;
+    
+    double start = omp_get_wtime();
+    #pragma omp parallel for num_threads(threads_count)
     for (int i = 0; i < image_width; i++) {
         for (int j = 0; j < image_height; j++) {
             for (int s = 0; s < samples_per_pixel; s++) {
                 auto u = (i + random_double()) / (image_width-1);
                 auto v = (j + random_double()) / (image_height-1);
+                int index = (i * image_height + j) * samples_per_pixel + s;
                 ray r = cam.get_ray(u, v);
                 color attenuation = color(1, 1, 1);
-                operation* new_op = new operation(r, attenuation, i, j, max_depth);
-                origin.push_back(new_op);
-                next.push_back(new_op);
+                shared_ptr<operation> new_op(new operation(r, attenuation, i, j, max_depth));
+                origin[index] = new_op;
+                curr[index] = index;
             }
         }
     }
+    std::cerr << "Time for initializing operations: " << omp_get_wtime() - start << std::endl;
 
-    while (next.size() > 0) {
-        std::cerr << "\rDepth remaining: " << next[0]->dep << " " << std::flush;
-        curr.swap(next);
-        next.clear();
-        for (int i = 0; i < curr.size(); i++) {
-            ray_color(*curr[i], world, background);
+    double t_cost, t_start, t_end;
+    t_start = omp_get_wtime();
+    #pragma omp parallel num_threads(threads_count)
+    while (count > 0) {
+        #pragma omp single
+        {
+            std::cerr << "\rDepth remaining: " << origin[curr[0]]->dep << " " << std::flush;
+        }
+        
+        #pragma omp for
+        for (int i = 0; i < count; i++) {
+            ray_color(origin[curr[i]], world, background);
+        }
+
+        #pragma omp single
+        {
+            int recount = 0;
+            for (int i = 0; i < count; i++) {
+                if (origin[curr[i]]->finished != 1) {
+                    curr[recount++] = curr[i];
+                }
+            }
+            count = recount;
         }
     }
-
-    color pixel_color(0, 0, 0);
-    for (int i = 0; i < samples_per_pixel; i++) {
-        std::cerr << "Index: " << origin[i]->indX << " " << origin[i]->indY << std::endl;
-        pixel_color += origin[i]->emit;
+    t_end = omp_get_wtime();
+    t_cost = t_end - t_start;
+    
+    for (int i = 0; i < image_width; i++) {
+        for (int j = 0; j < image_height; j++) {
+            color pixel_color(0, 0, 0);
+            int start_index = (i * image_height + j) * samples_per_pixel;
+            for (int s = 0; s < samples_per_pixel; s++) {
+                pixel_color += origin[start_index + s]->emit;
+            }
+            auto scale = 1.0 / samples_per_pixel;
+            auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
+            auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
+            auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
+            R(i, j) = r;
+            G(i, j) = g;
+            B(i, j) = b;
+        }
     }
-
-    auto scale = 1.0 / samples_per_pixel;
-    auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
-    auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
-    auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-    std::cout << r << " " << g << " " << b << std::endl;
-    // for (int i = 0; i < image_width; i++) {
-    //     for (int j = 0; j < image_height; j++) {
-    //         R(i, j) = clamp(sqrt(scale * R(i, j)), 0.0, 0.999);
-    //         G(i, j) = clamp(sqrt(scale * G(i, j)), 0.0, 0.999);
-    //         B(i, j) = clamp(sqrt(scale * B(i, j)), 0.0, 0.999);
-    //     }
-    // }
-
-    // double t_start, t_end;
-    // t_start = omp_get_wtime();
-    // #pragma omp parallel for num_threads(threads_count)
-    // for (int i = image_width - 1; i >= 0; --i) {
-    //     //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
-    //     for (int j = 0; j < image_height; ++j) {
-    //         color pixel_color(0,0,0);
-    //         for (int s = 0; s < samples_per_pixel; ++s) {
-    //             auto u = (i + random_double()) / (image_width-1);
-    //             auto v = (j + random_double()) / (image_height-1);
-    //             ray r = cam.get_ray(u, v);
-    //             pixel_color += ray_color(r, background, world, max_depth);
-    //         }
-    //         auto scale = 1.0 / samples_per_pixel;
-    //         // gamma = 2.0
-    //         auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
-    //         auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
-    //         auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-    //         R(i, j) = r;
-    //         G(i, j) = g;
-    //         B(i, j) = b;
-    //         A(i, j) = 1;
-    //     }
-    // }
-    // t_end = omp_get_wtime();
-    // std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
+    
+    std::cerr << "\nTime for parallel part is: " << t_cost << "s";
     std::cerr << "\nDone.\n";
 
 	// Save to png

@@ -19,6 +19,7 @@ class operation {
         int dep;
         int indX;
         int indY;
+        int finished = 0;
 };
 
 #endif
