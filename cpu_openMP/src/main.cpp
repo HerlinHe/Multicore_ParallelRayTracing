@@ -397,6 +397,7 @@ int main(int argc, char *argv[]) {
     std::vector<shared_ptr<operation>> origin(image_width * image_height * samples_per_pixel);
     std::vector<int> curr(image_width * image_height * samples_per_pixel);
     int count = image_width * image_height *samples_per_pixel;
+    int recount;
     
     double p_cost = 0, d_cost = 0; // time of parallel cost and reconstruct cost
     double start = omp_get_wtime();
@@ -435,8 +436,12 @@ int main(int argc, char *argv[]) {
             #pragma omp single
             {
                 p_cost += omp_get_wtime() - start;
-                int recount = 0;
+                recount = 0;
                 start = omp_get_wtime();
+            }
+
+            #pragma omp single
+            {
                 for (int i = 0; i < count; i++) {
                     if (origin[curr[i]]->finished != 1) {
                         curr[recount++] = curr[i];
