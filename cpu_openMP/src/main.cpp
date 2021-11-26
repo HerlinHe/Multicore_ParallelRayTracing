@@ -276,8 +276,8 @@ int main(int argc, char *argv[]) {
 
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 800;
-    int samples_per_pixel = 100;
-    int max_depth = 5;
+    int samples_per_pixel = 40;
+    int max_depth = 100;
 
     // World
 
@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
             lookat = point3(0,0,0);
             vfov = 20.0;
             aperture = 0.1;
-            image_width = 1200;
+            image_width = 800;
             aspect_ratio = 3.0 / 2.0;
             break;
 
