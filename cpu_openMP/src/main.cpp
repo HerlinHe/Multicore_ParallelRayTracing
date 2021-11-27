@@ -374,18 +374,23 @@ int main(int argc, char *argv[]) {
     camera cam(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
 
     // Render
-
-    MatrixXd R = MatrixXd::Zero(image_width, image_height);
+    bool allMatrix = true;
+    MatrixXd all = MatrixXd::Zero(image_width*image_height, 4);
+	MatrixXd R = MatrixXd::Zero(image_width, image_height);
 	MatrixXd G = MatrixXd::Zero(image_width, image_height);
 	MatrixXd B = MatrixXd::Zero(image_width, image_height);
 	MatrixXd A = MatrixXd::Zero(image_width, image_height); // Store the alpha mask
 
     double t_start, t_end;
-    t_start = omp_get_wtime();
-    #pragma omp parallel for num_threads(threads_count)
+    t_start = omp_get_wtime();    
+    double linear_start, linear_end,total;
+    #pragma omp parallel num_threads(threads_count) 
+    {
+    # pragma omp for collapse(2) schedule(static,8)
     for (int i = image_width - 1; i >= 0; --i) {
         //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
         for (int j = 0; j < image_height; ++j) {
+            linear_start = omp_get_wtime();
             color pixel_color(0,0,0);
             for (int s = 0; s < samples_per_pixel; ++s) {
                 auto u = (i + random_double()) / (image_width-1);
@@ -398,17 +403,45 @@ int main(int argc, char *argv[]) {
             auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
             auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
             auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-            R(i, j) = r;
-            G(i, j) = g;
-            B(i, j) = b;
-            A(i, j) = 1;
+            if (allMatrix){
+                int idx = i*j;
+                all(i*j, 0) = r;
+                all(i*j, 1) = g;
+                all(i*j, 2) = b;
+            }
+            else{
+                R(i, j) = r;
+                G(i, j) = g;
+                B(i, j) = b;
+            }
+            
+            linear_end = omp_get_wtime();
+            total = total+linear_end-linear_start;
         }
     }
+    if (allMatrix){
+        # pragma omp for
+        for (int i =0; i < image_width; ++i) {
+            //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
+            for (int j = 0; j < image_height; ++j) {
+                R(i,j) = all(i*j,0);
+                G(i,j) = all(i*j,0);
+                B(i,j) = all(i*j,0);
+                A(i,j) = 1;
+            }
+            }
+    }
+
+
+    }
     t_end = omp_get_wtime();
-    std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
+    std::cerr << "Time for parallel part is: " << t_end - t_start << "s, linear part:"<<total;
     std::cerr << "\nDone.\n";
 
+    
+
 	// Save to png
-	const std::string filename("raytrace.png");
+	const std::string filename("ray_trace.png");
 	write_matrix_to_png(R, G, B, A, filename);
+    std::cerr << "\nDone save image.\n"<<filename;
 }
