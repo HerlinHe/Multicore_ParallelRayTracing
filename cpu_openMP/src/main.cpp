@@ -19,6 +19,7 @@
 #include <iostream>
 #include <omp.h>
 #include <vector>
+#include <getopt.h>
 
 // Eigen for matrix operations
 #include <Eigen/Dense>
@@ -278,7 +279,7 @@ int main(int argc, char *argv[]) {
     // Threads Setting
     int threads_count = 0;
 
-    if(argc != 2)
+    if(argc < 2)
     {
 	printf("usage: ./genfile num\n");
 	printf("num of threads\n");
@@ -292,6 +293,36 @@ int main(int argc, char *argv[]) {
     int image_width = 800;
     int samples_per_pixel = 100;
     int max_depth = 5;
+
+    int c;
+    static struct option long_options[] = {
+        {"width", optional_argument, 0, 'w'},
+        {"sample", optional_argument, 0, 's'},
+        {"depth", optional_argument, 0, 'd'},};
+    while (true)
+    {
+        int option_index = 0;
+        c = getopt_long(argc, argv, "w:s:d",
+                        long_options, &option_index);
+        if (c == -1)
+            break;
+        switch (c)
+        {
+        case 'w':
+            image_width = atoi(optarg);
+            break;
+        case 's':
+            samples_per_pixel = atoi(optarg);
+            break;
+        case 'd':
+            max_depth = atoi(optarg);
+            break;
+        case '?':
+            break;
+        default:
+            printf("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
 
     // World
 
@@ -312,7 +343,7 @@ int main(int argc, char *argv[]) {
             lookat = point3(0,0,0);
             vfov = 20.0;
             aperture = 0.1;
-            image_width = 1200;
+            // image_width = 1200;
             aspect_ratio = 3.0 / 2.0;
             break;
 
