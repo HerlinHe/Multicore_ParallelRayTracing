@@ -329,7 +329,7 @@ int main(int argc, char *argv[]) {
             lookat = point3(0,0,0);
             vfov = 20.0;
             aperture = 0.1;
-            image_width = 800;
+            // image_width = 800;
             aspect_ratio = 3.0 / 2.0;
             break;
 
