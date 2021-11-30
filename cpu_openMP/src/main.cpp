@@ -405,7 +405,6 @@ int main(int argc, char *argv[]) {
     camera cam(lookfrom, lookat, vup, vfov, aspect_ratio, aperture, dist_to_focus, 0.0, 1.0);
 
     // Render
-    bool allMatrix = true;
     MatrixXd all = MatrixXd::Zero(image_width*image_height, 4);
 	MatrixXd R = MatrixXd::Zero(image_width, image_height);
 	MatrixXd G = MatrixXd::Zero(image_width, image_height);
@@ -434,37 +433,35 @@ int main(int argc, char *argv[]) {
             auto r = clamp(sqrt(scale * pixel_color.x()), 0.0, 0.999);
             auto g = clamp(sqrt(scale * pixel_color.y()), 0.0, 0.999);
             auto b = clamp(sqrt(scale * pixel_color.z()), 0.0, 0.999);
-            if (allMatrix){
-                int idx = i*j;
-                all(i*j, 0) = r;
-                all(i*j, 1) = g;
-                all(i*j, 2) = b;
-            }
-            else{
-                R(i, j) = r;
-                G(i, j) = g;
-                B(i, j) = b;
-            }
             
+            int idx = (j*image_width)+i;
+            all(idx, 0) = r;
+            all(idx, 1) = g;
+            all(idx, 2) = b;
+            // all(idx, 3) = 1;
+            
+            // R(i, j) = r;
+            // G(i, j) = g;
+            // B(i, j) = b;
+            // A(i, j) = 1;
             linear_end = omp_get_wtime();
             total = total+linear_end-linear_start;
         }
     }
-    if (allMatrix){
+    
         # pragma omp for
-        for (int i =0; i < image_width; ++i) {
-            //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
+        for (int i = image_width - 1; i >= 0; --i) {
             for (int j = 0; j < image_height; ++j) {
-                R(i,j) = all(i*j,0);
-                G(i,j) = all(i*j,0);
-                B(i,j) = all(i*j,0);
+                int idx = (j*image_width)+i;
+                R(i,j) = all(idx,0);
+                G(i,j) = all(idx,1);
+                B(i,j) = all(idx,2);
                 A(i,j) = 1;
             }
             }
     }
 
-
-    }
+    // std::cerr << 
     t_end = omp_get_wtime();
     std::cerr << "Time for parallel part is: " << t_end - t_start << "s, linear part:"<<total;
     std::cerr << "\nDone.\n";
