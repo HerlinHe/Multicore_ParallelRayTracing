@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
     double linear_start, linear_end,total;
     #pragma omp parallel num_threads(threads_count) 
     {
-    # pragma omp for collapse(2) schedule(static,8)
+    # pragma omp for
     for (int i = image_width - 1; i >= 0; --i) {
         //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
         for (int j = 0; j < image_height; ++j) {
