@@ -207,32 +207,26 @@ int main (int argc, char** argv) {
     }
   }
 
-  int nx, ny, ns;
+  int nx, ny;
   int tx = 8;
   int ty = 8;
+  int ns = 100;
 
   if (PROFILE_RENDER) {
-    nx = tx*8;
-    ny = ty*4;
-    ns = 10;
+    nx = 400;
+    ny = 267;
   } else if (SUPER_QUALITY_RENDER) {
-    nx = 600;
-    ny = 400;
-    ns = 100;
-    nx *= 2; ny *= 2;
-    ns /= 2;
+    nx = 1600;
+    ny = 1067;
   } else if (HIGH_QUALITY_RENDER) {
-    nx = 600;
-    ny = 400;
-    ns = 100;
+    nx = 1200;
+    ny = 800;
   } else if (MEDIUM_QUALITY_RENDER) {
-    nx = 1200;
-    ny = 800;
-    ns = 20;
+    nx = 800;
+    ny = 533;
   } else {
-    nx = 1200;
-    ny = 800;
-    ns = 100;
+    nx = 560;
+    ny = 373;
   }
 
 
