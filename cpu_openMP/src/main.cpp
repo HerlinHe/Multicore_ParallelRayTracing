@@ -277,8 +277,8 @@ int main(int argc, char *argv[]) {
 
     auto aspect_ratio = 16.0 / 9.0;
     int image_width = 800;
-    int samples_per_pixel = 100;
-    int max_depth = 5;
+    int samples_per_pixel = 40;
+    int max_depth = 125;
 
     int c;
     static struct option long_options[] = {
@@ -410,13 +410,13 @@ int main(int argc, char *argv[]) {
 	MatrixXd G = MatrixXd::Zero(image_width, image_height);
 	MatrixXd B = MatrixXd::Zero(image_width, image_height);
 	MatrixXd A = MatrixXd::Zero(image_width, image_height); // Store the alpha mask
+    MatrixXd T = MatrixXd::Zero(image_width, image_height);
 
     double t_start, t_end;
-    t_start = omp_get_wtime();
-    #pragma omp parallel for num_threads(threads_count)
     for (int i = image_width - 1; i >= 0; --i) {
         //std::cerr << "\rScanlines remaining: " << i << ' ' << std::flush;
         for (int j = 0; j < image_height; ++j) {
+            t_start = omp_get_wtime();
             color pixel_color(0,0,0);
             for (int s = 0; s < samples_per_pixel; ++s) {
                 auto u = (i + random_double()) / (image_width-1);
@@ -433,10 +433,52 @@ int main(int argc, char *argv[]) {
             G(i, j) = g;
             B(i, j) = b;
             A(i, j) = 1;
+            t_end = omp_get_wtime();
+            T(i, j) = t_end - t_start;
         }
     }
-    t_end = omp_get_wtime();
-    std::cerr << "Time for parallel part is: " << t_end - t_start << "s";
+    // print out the load for each thread
+    VectorXd thread_load = VectorXd::Zero(threads_count);
+    // static = 1
+    for (int i = image_width - 1; i >= 0; --i) {
+        double sum = 0.0;
+        for (int j = 0; j < image_height; ++j) {
+            sum += T(i, j);
+        }
+        thread_load[i % threads_count] += sum;
+    }
+    std::cout << "Static, 1" << std::endl;
+    for (int i = 0; i < threads_count; i++) {
+        std::cout << " " << thread_load[i];
+    }
+    std::cout << std::endl;
+    // static = defualt (image_width/threads_count)
+    int step = image_width / threads_count;
+    thread_load = VectorXd::Zero(threads_count);
+    for (int i = image_width - 1; i >= 0; --i) {
+        double sum = 0.0;
+        for (int j = 0; j < image_height; ++j) {
+            sum += T(i, j);
+        }
+        thread_load[(i % step) % threads_count] += sum;
+    }
+    std::cout << "Static, default" << std::endl;
+    for (int i = 0; i < threads_count; i++) {
+        std::cout << " " << thread_load[i];
+    }
+    std::cout << std::endl;
+    // static per pixel
+    thread_load = VectorXd::Zero(threads_count);
+    for (int i = image_width - 1; i >= 0; --i) {
+        for (int j = 0; j < image_height; ++j) {
+            int index = i * image_height + j;
+            thread_load[index % threads_count] += T(i, j);
+        }
+    }
+    std::cout << "Static, per pixel" << std::endl;
+    for (int i = 0; i < threads_count; i++) {
+        std::cout << " " << thread_load[i];
+    }
     std::cerr << "\nDone.\n";
 
 	// Save to png
