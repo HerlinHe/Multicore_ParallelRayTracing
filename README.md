@@ -20,25 +20,37 @@ Remember to create a new brach when you do your part of work.\
 **Build and Run**\
 The OpenMP version located in the directory ```cpu_openMP```. You need create a ```build``` directory in the root and run program there, do not generate binary file outside of it.
 
+To test on NYU CIMS `crunchy1.cims.nyu.edu` server, first load `cmake` and `gcc`:
+```zsh
+module load cmake-3
+module load gcc-11.2
+```
+
 ```zsh
 cd cpu_openMP
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=<Your G++ Compiler> ..
 make
-./parallel_ray_tracing <number of threads>
+./parallel_ray_tracing <number of threads> [--width] [--sample] [--depth]
 ```
+
+```
+# a sample execution with optional args:
+./parallel_ray_tracing 16 --width=1200 --sample=100 --depth=5
+```
+
 
 Making ```-DCMAKE_BUILD_TYPE``` to ```Release``` then you can accelerate your program.
 
 The option ```-DCMAKE_CXX_COMPILER``` specify your compiler, you should choose g++ which support openMP. If not specify the compiler, it will use your default compiler and may cause "Undefined symbols" error. The g++ version I use is g++11.\
 \
 **What You should Get**\
-If you choose ```world=random_scene()``` in the ```main``` function and set ```image_width``` to 1200, then you can get the following image following the instruction. It takes me more than half an hour to produce this picture with one thread on my laptop, a Macbook Pro 16' with Intel processor. And four threads can achieve triple accelerating.
+If you choose ```world=random_scene()```(default option) in the ```main``` function and set `--width=1200`, then you can get the following image following the instruction.
 
 !["Image Missing"](img/image.png?raw=true)
 
-A more complicated scene can be rendered when you set ```world=final_scene()``` in the ```main``` function. It takes me about 160mins to render this picture with one thread.
+A more complicated scene can be rendered when you set ```world=final_scene()``` in the ```main``` function. It takes about 160mins to render this picture with one thread.
 <p align="center">
   <img src="img/raytrace.png" />
 </p>
