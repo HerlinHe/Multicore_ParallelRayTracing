@@ -1,8 +1,9 @@
 # Multicore_ParallelRayTracing
 
 Final Project for Multicore Processors Course at NYU: Parallel Ray Tracing Algorithm with openMP\
-Add Cuda version for GPUs Course at NYU: Parallel Ray Tracing with Cuda\
 **Team Member:** Hanlin He, Yaowei Zong, Wenbo Song
+Add Cuda version for GPUs Course at NYU: Parallel Ray Tracing with Cuda\
+**Team Member:** Hanlin He, Yaowei Zong
 
 ## Source Code
 
