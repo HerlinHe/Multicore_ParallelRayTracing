@@ -16,9 +16,6 @@ else()
   message(STATUS "No CUDA support")
 endif()
 
-# Include Eigen for linear algebra, stb and gif-h to export images, json to parse the json files
-target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen" "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
-
 set ( SOURCE_CUDA
   src/rtweekend.cuh
   src/camera.cuh
@@ -37,3 +34,6 @@ set ( SOURCE_CUDA
   )
 
 add_executable(parallel_cuda   ${SOURCE_CUDA})
+
+# Include Eigen for linear algebra, stb and gif-h to export images, json to parse the json files
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen" "${CMAKE_CURRENT_SOURCE_DIR}/external/stb")
