@@ -1,7 +1,8 @@
 #ifndef BVH_CUH
 #define BVH_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 #include "hittable.cuh"
 
 #include <curand_kernel.h>
