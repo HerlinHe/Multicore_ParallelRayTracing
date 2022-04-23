@@ -1,7 +1,8 @@
 #ifndef CAMERA_CUH     /* -*- cuda -*- */
 #define CAMERA_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 
 #include <curand_kernel.h>
 
