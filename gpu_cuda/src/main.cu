@@ -12,13 +12,7 @@
 #include <float.h>
 #include <curand_kernel.h>
 
-/* Note, doing a straight translation from the original C++ will mean that any
-   floating-point constants will be doubles and math on the GPU will be forced
-   to be double-precision.  This will hurt our performance unnecessarily.
-   Special attention to floating point constants must be taken (e.g. 0.5 ->
-   0.5f). */
-
-// limited version of checkCudaErrors from helper_cuda.h in CUDA examples
+// initialize cudaerror checker
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
 void check_cuda(cudaError_t result, char const *const func, const char *const file, int const line) {
@@ -31,10 +25,7 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
   }
 }
 
-// Matching the C++ code would recurse enough into color() calls that
-// it was blowing up the stack, so we have to turn this into a
-// limited-depth loop instead.  Later code in the book limits to a max
-// depth of 50, so we adapt this a few chapters early on the GPU.
+// The infinite recursion in C++ version is not suitable for CUDA, so fix the recursion depth
 __device__ vec3 color(const ray& r, hittable **world, curandState *local_rand_state) {
   ray cur_ray = r;
   vec3 cur_attenuation = vec3(1.0,1.0,1.0);
