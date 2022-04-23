@@ -1,7 +1,8 @@
 #ifndef TEXTURE_CUH
 #define TEXTURE_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 
 class Texture {
 public:
