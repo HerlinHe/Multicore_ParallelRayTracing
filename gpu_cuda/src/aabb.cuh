@@ -1,7 +1,8 @@
 #ifndef AABB_CUH
 #define AABB_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 
 #include <thrust/swap.h>
 
