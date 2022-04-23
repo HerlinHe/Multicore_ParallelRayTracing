@@ -1,7 +1,8 @@
 #ifndef MATERIAL_CUH             /* -*- cuda -*- */
 #define MATERIAL_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 #include "texture.cuh"
 
 #include "hittable.cuh"
