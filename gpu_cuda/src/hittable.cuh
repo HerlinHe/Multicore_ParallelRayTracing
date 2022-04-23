@@ -1,7 +1,8 @@
 #ifndef HITTABLE_CUH     /* -*- cuda -*- */
 #define HITTABLE_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 #include "aabb.cuh"
 
 class material;
