@@ -1,7 +1,8 @@
 #ifndef MOVING_SPHERE_CUH  /* -*- cuda -*- */
 #define MOVING_SPHERE_CUH
 
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 #include "hittable.cuh"
 
 class moving_sphere: public hittable  {
