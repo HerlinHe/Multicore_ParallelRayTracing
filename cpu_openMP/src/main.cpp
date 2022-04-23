@@ -273,12 +273,57 @@ int main(int argc, char *argv[]) {
     }
     threads_count = atoi(argv[1]);
 
+    // default values
+    bool SUPER_QUALITY_RENDER = !true;
+    bool HIGH_QUALITY_RENDER = !true;
+    bool MEDIUM_QUALITY_RENDER = !true;
+    bool PROFILE_RENDER = !true;
+
+    // handle command line arguments
+    if (argc >= 3) {
+        // first command line argument is "PR"?
+        if (std::string(argv[2]) == "PR") {
+        PROFILE_RENDER = true;
+        }
+        // first command line argument is "SH"?
+        if (std::string(argv[2]) == "SH") {
+        SUPER_QUALITY_RENDER = true;
+        }
+        // first command line argument is "HQ"?
+        if (std::string(argv[2]) == "HQ") {
+        HIGH_QUALITY_RENDER = true;
+        }
+        // first command line argument is "MQ"?
+        if (std::string(argv[2]) == "MQ") {
+        MEDIUM_QUALITY_RENDER = true;
+        }
+    }
+
     // Image
 
-    auto aspect_ratio = 16.0 / 9.0;
-    int image_width = 800;
+    int image_width;
+    int image_hight;
     int samples_per_pixel = 100;
     int max_depth = 5;
+
+    if (PROFILE_RENDER) {
+        image_width = 400;
+        image_hight = 267;
+    } else if (SUPER_QUALITY_RENDER) {
+        image_width = 1600;
+        image_hight = 1067;
+    } else if (HIGH_QUALITY_RENDER) {
+        image_width = 1200;
+        image_hight = 800;
+    } else if (MEDIUM_QUALITY_RENDER) {
+        image_width = 800;
+        image_hight = 533;
+    } else {
+        image_width = 560;
+        image_hight = 373;
+    }
+
+    auto aspect_ratio = 1.0 * image_width / image_hight;
 
     int c;
     static struct option long_options[] = {

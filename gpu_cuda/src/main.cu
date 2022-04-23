@@ -12,6 +12,12 @@
 #include <float.h>
 #include <curand_kernel.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#include "utils.h"
+#include <Eigen/Dense>
+using namespace Eigen;
+
 // initialize cudaerror checker
 #define checkCudaErrors(val) check_cuda( (val), #val, __FILE__, __LINE__ )
 
@@ -28,8 +34,8 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
 // The infinite recursion in C++ version is not suitable for CUDA, so fix the recursion depth
 __device__ vec3 color(const ray& r, hittable **world, curandState *local_rand_state) {
   ray cur_ray = r;
-  vec3 cur_attenuation = vec3(1.0,1.0,1.0);
-  for(int i = 0; i < 50; i++) {
+  vec3 cur_attenuation(1.0f,1.0f,1.0f);
+  for(int i = 0; i < 10; i++) { // max depth set to 10 here
     hit_record rec;
     if ((*world)->hit(cur_ray, 0.001f, FLT_MAX, rec)) {
       ray scattered;
@@ -39,23 +45,17 @@ __device__ vec3 color(const ray& r, hittable **world, curandState *local_rand_st
         cur_ray = scattered;
       }
       else {
-        return vec3(0.0,0.0,0.0);
+        return vec3(0.0f,0.0f,0.0f); // black surface
       }
     }
     else {
       vec3 unit_direction = unit_vector(cur_ray.direction());
       float t = 0.5f*(unit_direction.y() + 1.0f);
-      vec3 c = (1.0f-t)*vec3(1.0, 1.0, 1.0) + t*vec3(0.5, 0.7, 1.0);
+      vec3 c = (1.0f-t)*vec3(1.0f, 1.0f, 1.0f) + t*vec3(0.5f, 0.7f, 1.0f); // background color
       return cur_attenuation * c;
     }
   }
   return vec3(0.0,0.0,0.0); // exceeded recursion
-}
-
-__global__ void rand_init(curandState *rand_state) {
-  if (threadIdx.x == 0 && blockIdx.x == 0) {
-    curand_init(1984, 0, 0, rand_state);
-  }
 }
 
 __global__ void render_init(int max_x, int max_y, curandState *rand_state) {
@@ -88,13 +88,17 @@ __global__ void render(vec3 *fb, int max_x, int max_y, int ns, camera **cam, hit
   fb[pixel_index] = col;
 }
 
+__global__ void rand_init(curandState *rand_state) {
+  if (threadIdx.x == 0 && blockIdx.x == 0) {
+    curand_init(1984, 0, 0, rand_state);
+  }
+}
+
 #define RND (curand_uniform(&local_rand_state))
 
 __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_camera, int nx, int ny, curandState *rand_state) {
   if (threadIdx.x == 0 && blockIdx.x == 0) {
     curandState local_rand_state = *rand_state;
-    // d_list[0] = new sphere(vec3(0,-1000.0,-1), 1000,
-    //                        new lambertian(vec3(0.5, 0.5, 0.5)));
     Texture *checker = new checker_texture(
                                            new constant_texture(vec3(0.2, 0.3, 0.1)),
                                            new constant_texture(vec3(0.9, 0.9, 0.9))
@@ -103,40 +107,29 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
                                   0.f, 1.f,
                                   1000,
                                   new lambertian(checker));
-    // d_list[0] = new moving_sphere(vec3(0,-1000.0,-1), vec3(0,-1000.0,-1),
-    //                               0.f, 1.f,
-    //                               1000,
-    //                               new lambertian(new constant_texture(vec3(0.5, 0.5, 0.5))));
     int i = 1;
     for(int a = -11; a < 11; a++) {
       for(int b = -11; b < 11; b++) {
         float choose_mat = RND;
         vec3 center(a+RND,0.2,b+RND);
         if(choose_mat < 0.8f) {
-          // d_list[i++] = new sphere(center, 0.2,
-          //                          new lambertian(vec3(RND*RND, RND*RND, RND*RND)));
           d_list[i++] = new moving_sphere(center, center+vec3(0, 0.5*RND, 0),
                                           0.f, 1.f,
                                           0.2,
                                           new lambertian(new constant_texture(vec3(RND*RND, RND*RND, RND*RND))));
         }
         else if(choose_mat < 0.95f) {
-          // d_list[i++] = new sphere(center, 0.2,
-          //                          new metal(vec3(0.5f*(1.0f+RND), 0.5f*(1.0f+RND), 0.5f*(1.0f+RND)), 0.5f*RND));
           d_list[i++] = new moving_sphere(center, center,
                                    0.f, 1.f,
                                    0.2,
                                    new metal(vec3(0.5f*(1.0f+RND), 0.5f*(1.0f+RND), 0.5f*(1.0f+RND)), 0.5f*RND));
         }
         else {
-          //d_list[i++] = new sphere(center, 0.2, new dielectric(1.5));
           d_list[i++] = new moving_sphere(center, center, 0.f, 1.f, 0.2, new dielectric(1.5));
         }
       }
     }
-    // d_list[i++] = new sphere(vec3(0, 1,0),  1.0, new dielectric(1.5));
-    // d_list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(vec3(0.4, 0.2, 0.1)));
-    // d_list[i++] = new sphere(vec3(4, 1, 0),  1.0, new metal(vec3(0.7, 0.6, 0.5), 0.0));
+    
     d_list[i++] = new moving_sphere(vec3(0, 1,0),  vec3(0, 1,0),   0.f, 1.f, 1.0, new dielectric(1.5));
     d_list[i++] = new moving_sphere(vec3(-4, 1, 0),vec3(-4, 1, 0), 0.f, 1.f, 1.0,
                                     new lambertian(new constant_texture(vec3(0.4, 0.2, 0.1))));
@@ -147,7 +140,6 @@ __global__ void create_world(hittable **d_list, hittable **d_world, camera **d_c
     vec3 lookfrom(13,2,3);
     vec3 lookat(0,0,0);
     float dist_to_focus = 10.0; (lookfrom-lookat).length();
-    //float aperture = 0.1f;
     float aperture = 0.0f;
     *d_camera   = new camera(lookfrom,
                              lookat,
@@ -180,7 +172,7 @@ int main (int argc, char** argv) {
 
   // handle command line arguments
   if (argc >= 2) {
-    // first command line argument is "SH"?
+    // first command line argument is "PR"?
     if (std::string(argv[1]) == "PR") {
       PROFILE_RENDER = true;
     }
@@ -270,6 +262,11 @@ int main (int argc, char** argv) {
   double timer_seconds = ((double)(stop - start)) / CLOCKS_PER_SEC;
   std::cerr << "took " << timer_seconds << " seconds.\n";
 
+  MatrixXd R = MatrixXd::Zero(nx, ny);
+	MatrixXd G = MatrixXd::Zero(nx, ny);
+	MatrixXd B = MatrixXd::Zero(nx, ny);
+	MatrixXd A = MatrixXd::Zero(nx, ny); // Store the alpha mask
+
   // Output FB as Image
   std::cout << "P3\n" << nx << " " << ny << "\n255\n";
   for (int j = ny-1; j >= 0; j--) {
@@ -278,9 +275,14 @@ int main (int argc, char** argv) {
       int ir = int(255.99*fb[pixel_index].r());
       int ig = int(255.99*fb[pixel_index].g());
       int ib = int(255.99*fb[pixel_index].b());
-      std::cout << ir << " " << ig << " " << ib << "\n";
+      R(i, j) = ir;
+      G(i, j) = ig;
+      B(i, j) = ib;
+      A(i, j) = 1;
     }
   }
+  const std::string filename("raytrace.png");
+	write_matrix_to_png(R, G, B, A, filename);
 
   // clean up
   checkCudaErrors(cudaDeviceSynchronize());  // errors in profiler
