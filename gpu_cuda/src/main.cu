@@ -1,5 +1,5 @@
-
-#include "rtweekend.cuh"
+#include "vec3.cuh"
+#include "ray.cuh"
 #include "camera.cuh"
 #include "texture.cuh"
 #include "sphere.cuh"
@@ -14,7 +14,6 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#include "utils.h"
 #include <Eigen/Dense>
 using namespace Eigen;
 
@@ -29,6 +28,51 @@ void check_cuda(cudaError_t result, char const *const func, const char *const fi
     cudaDeviceReset();
     exit(99);
   }
+}
+
+// function to write image
+
+unsigned char double_to_unsignedchar(const double d) {
+	return round(std::max(std::min(1.,d),0.)*255);
+}
+
+void write_matrix_to_uint8(
+	const Eigen::MatrixXd& R, const Eigen::MatrixXd& G,
+	const Eigen::MatrixXd& B, const Eigen::MatrixXd& A,
+	std::vector<uint8_t>& image)
+{
+	assert(R.rows() == G.rows() && G.rows() == B.rows() && B.rows() == A.rows());
+	assert(R.cols() == G.cols() && G.cols() == B.cols() && B.cols() == A.cols());
+
+	const int w = R.rows();                              // Image width
+	const int h = R.cols();                              // Image height
+	const int comp = 4;                                  // 4 Channels Red, Green, Blue, Alpha
+	const int stride_in_bytes = w*comp;                  // Length of one row in bytes
+	image.resize(w*h*comp,0);         // The image itself;
+
+	for (unsigned wi = 0; wi < w; ++wi) {
+		for (unsigned hi = 0; hi < h; ++hi) {
+			image[(hi * w * 4) + (wi * 4) + 0] = double_to_unsignedchar(R(wi,hi));
+			image[(hi * w * 4) + (wi * 4) + 1] = double_to_unsignedchar(G(wi,hi));
+			image[(hi * w * 4) + (wi * 4) + 2] = double_to_unsignedchar(B(wi,hi));
+			image[(hi * w * 4) + (wi * 4) + 3] = double_to_unsignedchar(A(wi,hi));
+		}
+	}
+}
+void write_matrix_to_png(
+	const Eigen::MatrixXd& R, const Eigen::MatrixXd& G,
+	const Eigen::MatrixXd& B, const Eigen::MatrixXd& A,
+	const std::string& filename)
+{
+	const int w = R.rows();                              // Image width
+	const int h = R.cols();                              // Image height
+	const int comp = 4;                                  // 3 Channels Red, Green, Blue, Alpha
+	const int stride_in_bytes = w*comp;                  // Length of one row in bytes
+
+	std::vector<uint8_t> image;
+	write_matrix_to_uint8(R,G,B,A,image);
+	stbi_write_png(filename.c_str(), w, h, comp, image.data(), stride_in_bytes);
+
 }
 
 // The infinite recursion in C++ version is not suitable for CUDA, so fix the recursion depth
@@ -268,17 +312,16 @@ int main (int argc, char** argv) {
 	MatrixXd A = MatrixXd::Zero(nx, ny); // Store the alpha mask
 
   // Output FB as Image
-  std::cout << "P3\n" << nx << " " << ny << "\n255\n";
-  for (int j = ny-1; j >= 0; j--) {
+  for (int j = 0; j < ny; j++) {
     for (int i = 0; i < nx; i++) {
       size_t pixel_index = j*nx + i;
-      int ir = int(255.99*fb[pixel_index].r());
-      int ig = int(255.99*fb[pixel_index].g());
-      int ib = int(255.99*fb[pixel_index].b());
-      R(i, j) = ir;
-      G(i, j) = ig;
-      B(i, j) = ib;
-      A(i, j) = 1;
+      auto ir = fb[pixel_index].r();
+      auto ig = fb[pixel_index].g();
+      auto ib = fb[pixel_index].b();
+      R(i, ny-1-j) = ir;
+      G(i, ny-1-j) = ig;
+      B(i, ny-1-j) = ib;
+      A(i, ny-1-j) = 1;
     }
   }
   const std::string filename("raytrace.png");
