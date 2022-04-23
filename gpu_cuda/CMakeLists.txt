@@ -22,7 +22,6 @@ set ( SOURCE_CUDA
   src/ray.cuh
   src/vec3.cuh
   src/aabb.cuh
-  src/external/rtw_stb_image.h
   src/texture.cuh
   src/bvh.cuh
   src/moving_sphere.cuh
